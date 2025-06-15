@@ -2,17 +2,22 @@
   <div class="wrapper">
     <h1>💼 My Portfolio</h1>
 
-    <!-- Add Entry Form -->
+    <NuxtLink class="link" to="/">
+      Back
+    </NuxtLink>
+
     <form @submit.prevent="addEntry" class="form">
-      <input v-model="newEntry.currency" placeholder="Currency (e.g. Bitcoin)" required />
-      <input v-model.number="newEntry.amount" type="number" step="any" placeholder="Amount" required />
-      <input v-model.number="newEntry.purchasePrice" type="number" step="any" placeholder="Purchase Price (€)"
-        required />
-      <input v-model="newEntry.purchaseTime" type="datetime-local" required />
-      <button type="submit">➕ Add</button>
+      <select v-model="newEntry.currency" @change="handleAmountChange" required>
+        <option disabled value="">Select currency</option>
+        <option v-for="currency in popularCurrencies" :key="currency" :value="currency">
+          {{ currency }}
+        </option>
+      </select>
+      <input v-model.number="newEntry.amount" type="number" @input="handleAmountChange" placeholder="Amount" required />
+      <input :value="`${newEntry.purchasePrice} €`" disabled placeholder="Auto-calculated price (€)" />
+      <button type="submit"> + Add</button>
     </form>
 
-    <!-- Portfolio Table -->
     <table class="crypto-table" v-if="portfolio.length">
       <thead>
         <tr>
@@ -28,13 +33,14 @@
           <td>{{ entry.currency }}</td>
           <td>{{ entry.amount }}</td>
           <td>{{ entry.purchasePrice }}</td>
-          <td>{{ formatDate(entry.purchaseTime) }}</td>
+          <td>{{ entry.purchaseTime }}</td>
           <td><button @click="deleteEntry(entry.id)">🗑 Delete</button></td>
         </tr>
       </tbody>
     </table>
 
-    <p v-else>No portfolio entries yet.</p>
+
+    <p v-else>No entries..</p>
 
     <!-- Total Value -->
     <div class="total">
@@ -44,7 +50,9 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
+
+const API_URL = 'http://localhost:3001/portfolio'
 
 const portfolio = ref([])
 const totalValue = ref(0)
@@ -52,44 +60,79 @@ const totalValue = ref(0)
 const newEntry = ref({
   currency: '',
   amount: null,
-  purchasePrice: null,
+  purchasePrice: 0,
   purchaseTime: ''
 })
 
-// Fetch portfolio from backend
+const popularCurrencies = [
+  'Bitcoin',
+  'Ethereum',
+  'Binance Coin',
+  'Cardano',
+  'Solana'
+]
+
+
+const currencyValues = computed(() => ({
+  Bitcoin: 91310.44,
+  Ethereum: 2193.31,
+  'Binance Coin': 562,
+  Cardano: 0.54,
+  Solana: 126.67
+}))
+
+
+const handleAmountChange = () => {
+  const currency = newEntry.value.currency
+  const amount = newEntry.value.amount
+  const price = currencyValues.value[currency]
+
+  newEntry.value.purchasePrice = (amount * price).toFixed(2)
+}
+
+
 const fetchPortfolio = async () => {
-  const { data } = await useFetch('/api/portfolio')
-  if (data.value) {
-    portfolio.value = data.value.entries
-    totalValue.value = data.value.total
-  }
+  const res = await fetch(API_URL)
+  portfolio.value = await res.json()
+  totalValue.value = portfolio.value.reduce((acc, entry) => acc + entry.amount * entry.purchasePrice, 0).toFixed(2)
 }
 
-// Add new portfolio entry
 const addEntry = async () => {
-  await $fetch('/api/portfolio', {
+  newEntry.value.purchaseTime = new Date().toLocaleString()
+  await fetch(API_URL, {
     method: 'POST',
-    body: newEntry.value
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(newEntry.value)
   })
+
   newEntry.value = { currency: '', amount: null, purchasePrice: null, purchaseTime: '' }
-  fetchPortfolio()
+  await fetchPortfolio()
 }
 
-// Delete an entry
+
 const deleteEntry = async (id) => {
-  await $fetch(`/api/portfolio/${id}`, { method: 'DELETE' })
-  fetchPortfolio()
+  await fetch(`${API_URL}/${id}`, { method: 'DELETE' })
+  await fetchPortfolio()
 }
-
-// Format datetime
-const formatDate = (iso) => new Date(iso).toLocaleString()
 
 onMounted(() => {
   fetchPortfolio()
 })
 </script>
 
+
+
 <style scoped>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');
+
+body {
+  margin: 0;
+  padding: 0;
+  background: #f9f9f9;
+  font-family: 'Inter', sans-serif;
+  color: #1f1f1f;
+}
+
 .wrapper {
   max-width: 800px;
   margin: 2rem auto;
@@ -144,5 +187,22 @@ button:hover {
   font-size: 1.2rem;
   font-weight: bold;
   text-align: right;
+}
+
+.link {
+  display: inline-block;
+  margin-bottom: 2rem;
+  text-decoration: none;
+  color: #0066cc;
+  font-weight: 600;
+  border: 1px solid #0066cc;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  transition: all 0.3s ease;
+}
+
+.link:hover {
+  background-color: #0066cc;
+  color: #fff;
 }
 </style>

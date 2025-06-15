@@ -1,7 +1,10 @@
 <template>
     <div class="wrapper">
         <h1 class="greeting">Crypto Trackr</h1>
-        <NuxtLink class="link" to="/portfolio">💼 View Portfolio</NuxtLink>
+        <NuxtLink class="link" to='/portfolio'>
+            💼 View Portfolio
+        </NuxtLink>
+
 
         <div class="filters">
             <input type="date" v-model="startDate" />
@@ -140,7 +143,7 @@ if (btcData.value && ethData.value) {
     const dailyMap = new Map();
 
     btcPrices.forEach((btcEntry, i) => {
-        const date = new Date(btcEntry[0]).toISOString().split('T')[0];
+        const date = new Date(btcEntry[0]).toLocaleString().split('T')[0];
 
         if (!dailyMap.has(date)) {
             dailyMap.set(date, {

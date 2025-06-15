@@ -1,37 +1,47 @@
 <template>
     <div class="wrapper">
-        <h1 class="greeting">Crypto trackr</h1>
+        <h1 class="greeting">Crypto Trackr</h1>
         <NuxtLink class="link" to="/portfolio">💼 View Portfolio</NuxtLink>
 
-        <input type="date" v-model="startDate">
-        <input type="date" v-model="endDate">
-        <button @click="fromTo">Search</button>
-        <button @click="reset">Reset</button>
+        <div class="filters">
+            <input type="date" v-model="startDate" />
+            <input type="date" v-model="endDate" />
+            <button @click="filterByDate">Search</button>
+            <button @click="reset">Reset</button>
+        </div>
 
         <div v-if="filteredHistory">
             <table class="crypto-table">
                 <thead>
                     <tr>
+                        <th>Coin</th>
                         <th>Date</th>
-                        <th>Last week</th>
-                        <th>Bitcoin (BTC)</th>
-                        <th>Last week</th>
-                        <th>Ethereum (ETH)</th>
+                        <th>Last 24h</th>
+                        <th>Last Week</th>
+                        <th>Price</th>
                     </tr>
                 </thead>
-                <tbody>
-                    <tr v-for="(entry, index) in currentValue" :key="index">
+                <tbody v-for="(entry, index) in currentValue" :key="index">
+                    <tr>
+                        <td>{{ "Bitcoin (BTC)" }}</td>
                         <td>{{ entry.date }}</td>
-                        <td :class="{ increase: hasIncreasedBtc }">{{ changes.bitcoinChange }} %</td>
-                        <td>{{ entry.bitcoin }} €</td>
-                        <td :class="{ increase: hasIncreasedEth }">{{ changes.ethereumChange }} %</td>
-                        <td>{{ entry.ethereum }} €</td>
+                        <td :class="btcClass">{{ changes.bitcoinChangeOneDay }}%</td>
+                        <td :class="btcClass">{{ changes.bitcoinChange }}%</td>
+                        <td><b>{{ entry.bitcoin }} €</b> </td>
                     </tr>
+                    <tr>
+                        <td>{{ "Ethereum (ETH)" }}</td>
+                        <td>{{ entry.date }}</td>
+                        <td :class="ethClass">{{ changes.ethereumChangeOneDay }}%</td>
+                        <td :class="ethClass">{{ changes.ethereumChange }}%</td>
+                        <td><b>{{ entry.ethereum }} €</b> </td>
+                    </tr>
+
                 </tbody>
             </table>
-            <button @click="handleShowHistory">
-                Load history
-            </button>
+
+            <button @click="toggleHistory">{{ showHistory ? 'Hide' : 'Load' }} History</button>
+
             <table class="crypto-table" v-if="showHistory">
                 <thead>
                     <tr>
@@ -49,141 +59,132 @@
                 </tbody>
             </table>
         </div>
-        <div v-else>Loading...</div>
 
-        {{ currentDate }}
-        {{ lastWeekDate }}
+        <div v-else>Loading...</div>
     </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed } from 'vue';
 
-// Refs
-const priceHistory = ref([])
-const filteredHistory = ref([])
-const startDate = ref(null)
-const endDate = ref(null)
-const daysBack = ref(7)
-const currentValue = ref(null)
-const showHistory = ref(false)
-const changes = ref({ bitcoinChange: null, ethereumChange: 2 })
-const hasIncreasedBtc = ref(null)
-const hasIncreasedEth = ref(null)
+const priceHistory = ref([]);
+const filteredHistory = ref([]);
+const startDate = ref(null);
+const endDate = ref(null);
+const daysBack = ref(90);
+const currentValue = ref([]);
+const showHistory = ref(false);
 
+const changes = ref({ bitcoinChange: null, ethereumChange: null, bitcoinChangeOneDay: null, ethereumChangeOneDay: null });
+const hasIncreasedBtc = ref(null);
+const hasIncreasedEth = ref(null);
+const hasDecreasedBtc = ref(null);
+const hasDecreasedEth = ref(null);
 
-// Dates
-const currentDate = new Date()
-const lastWeekDate = new Date(currentDate.getTime() - 7 * 24 * 60 * 60 * 1000)
+const btcClass = computed(() => (hasIncreasedBtc.value ? 'increase' : 'decrease'));
+const ethClass = computed(() => (hasIncreasedEth.value ? 'increase' : 'decrease'));
 
-// Sort helper
-const sortByDateDesc = (arr) =>
-    arr.sort((a, b) => new Date(b.date) - new Date(a.date))
+const sortByDateDesc = (arr) => arr.sort((a, b) => new Date(b.date) - new Date(a.date));
 
-// Percentage calculation function
 const calculateWeeklyChange = () => {
-    if (!priceHistory.value?.length) return null;
+    if (!priceHistory.value.length) return;
 
     const sorted = sortByDateDesc([...priceHistory.value]);
+    const current = sorted[0];
+    const currentDate = new Date(current.date);
+    const currentBtc = parseFloat(current.bitcoin);
+    const currentEth = parseFloat(current.ethereum);
 
-    // 1. Get current price (most recent entry)
-    const currentEntry = sorted[0];
-    const currentDate = new Date(currentEntry.date);
-    const currentBtc = parseFloat(currentEntry.bitcoin);
-    const currentEth = parseFloat(currentEntry.ethereum);
-
-    // 2. Calculate date exactly 7 days ago
     const sevenDaysAgo = new Date(currentDate);
     sevenDaysAgo.setDate(currentDate.getDate() - 7);
 
-    // 3. Find the closest historical entry to 7 days ago
-    const pastEntry = sorted.find(entry => {
-        const entryDate = new Date(entry.date);
-        return entryDate <= sevenDaysAgo;
-    });
+    const dayAgo = new Date(currentDate);
+    dayAgo.setDate(currentDate.getDate() - 1)
 
-    if (!pastEntry) return null; // No data from 7 days ago
+    const past = sorted.find(e => new Date(e.date) <= sevenDaysAgo);
+    const pastOneDay = sorted.find(e => new Date(e.date) <= dayAgo);
+    if (!past) return;
 
-    // 4. Calculate percentage changes
-    const btcChange =
-        ((currentBtc - parseFloat(pastEntry.bitcoin)) / parseFloat(pastEntry.bitcoin)) * 100;
-    const ethChange =
-        ((currentEth - parseFloat(pastEntry.ethereum)) / parseFloat(pastEntry.ethereum)) * 100;
+    const btcChange = ((currentBtc - parseFloat(past.bitcoin)) / parseFloat(past.bitcoin)) * 100;
+    const ethChange = ((currentEth - parseFloat(past.ethereum)) / parseFloat(past.ethereum)) * 100;
+
+    const btcChangeOneDay = ((currentBtc - parseFloat(pastOneDay.bitcoin)) / parseFloat(pastOneDay.bitcoin)) * 100;
+    const ethChangeOneDay = ((currentEth - parseFloat(pastOneDay.ethereum)) / parseFloat(pastOneDay.ethereum)) * 100;
 
 
-    changes.value.bitcoinChange = btcChange.toFixed(2)
-    changes.value.ethereumChange = ethChange.toFixed(2)
-    changes.value.bitcoinChange >= 0 ? hasIncreasedBtc.value = true : hasIncreasedBtc.value = false
-    changes.value.ethereumChange >= 0 ? hasIncreasedEth.value = true : hasIncreasedEth.value = false
+    changes.value.bitcoinChange = btcChange.toFixed(2);
+    changes.value.ethereumChange = ethChange.toFixed(2);
+    changes.value.bitcoinChangeOneDay = btcChangeOneDay.toFixed(2);
+    changes.value.ethereumChangeOneDay = ethChangeOneDay.toFixed(2);
 
+    hasIncreasedBtc.value = btcChange >= 0;
+    hasDecreasedBtc.value = btcChange < 0;
+    hasIncreasedEth.value = ethChange >= 0;
+    hasDecreasedEth.value = ethChange < 0;
 };
 
-// Fetch data (inside top-level async setup)
 const { data: btcData } = await useFetch(
     'https://api.coingecko.com/api/v3/coins/bitcoin/market_chart',
-    {
-        params: { vs_currency: 'eur', days: daysBack }
-    }
-)
+    { params: { vs_currency: 'eur', days: daysBack } }
+);
 
 const { data: ethData } = await useFetch(
     'https://api.coingecko.com/api/v3/coins/ethereum/market_chart',
-    {
-        params: { vs_currency: 'eur', days: daysBack }
-    }
-)
+    { params: { vs_currency: 'eur', days: daysBack } }
+);
 
 if (btcData.value && ethData.value) {
-    const btcPrices = btcData.value.prices
-    const ethPrices = ethData.value.prices
+    const btcPrices = btcData.value.prices;
+    const ethPrices = ethData.value.prices;
 
-    priceHistory.value = btcPrices.map((btcEntry, index) => {
-        const date = new Date(btcEntry[0]).toISOString().split('.')[0]
-        return {
-            date,
-            bitcoin: btcEntry[1].toFixed(2),
-            ethereum: ethPrices[index]
-                ? ethPrices[index][1].toFixed(2)
-                : 'N/A'
+    const dailyMap = new Map();
+
+    btcPrices.forEach((btcEntry, i) => {
+        const date = new Date(btcEntry[0]).toISOString().split('T')[0];
+
+        if (!dailyMap.has(date)) {
+            dailyMap.set(date, {
+                date,
+                bitcoin: btcEntry[1].toFixed(2),
+                ethereum: ethPrices[i] ? ethPrices[i][1].toFixed(2) : 'N/A',
+            });
         }
-    })
+    });
 
-    // Set filtered list and current value
-    filteredHistory.value = sortByDateDesc([...priceHistory.value]).slice(0, 20)
-    currentValue.value = filteredHistory.value.slice(0, 1)
+    priceHistory.value = Array.from(dailyMap.values());
 
-    calculateWeeklyChange()
+    filteredHistory.value = sortByDateDesc([...priceHistory.value]).slice(0, 20);
+    currentValue.value = filteredHistory.value.slice(0, 1);
+    calculateWeeklyChange();
 }
 
-// Show/hide history
-const handleShowHistory = () => {
-    showHistory.value = !showHistory.value
-}
 
-// From-to date filter
-const fromTo = () => {
+const toggleHistory = () => {
+    showHistory.value = !showHistory.value;
+};
+
+const filterByDate = () => {
     if (!startDate.value || !endDate.value) {
-        filteredHistory.value = sortByDateDesc([...priceHistory.value]).slice(0, 20)
-        return
+        filteredHistory.value = sortByDateDesc([...priceHistory.value]).slice(0, 20);
+        return;
     }
 
-    const start = new Date(startDate.value)
-    const end = new Date(endDate.value)
+    const start = new Date(startDate.value);
+    const end = new Date(endDate.value);
 
     filteredHistory.value = sortByDateDesc(
-        priceHistory.value.filter((entry) => {
-            const entryDate = new Date(entry.date)
-            return entryDate >= start && entryDate <= end
+        priceHistory.value.filter(entry => {
+            const date = new Date(entry.date);
+            return date >= start && date <= end;
         })
-    ).slice(0, 20)
-}
+    ).slice(0, 20);
+};
 
-// Reset
 const reset = () => {
-    filteredHistory.value = sortByDateDesc([...priceHistory.value]).slice(0, 20)
-    daysBack.value = 7
-}
+    filteredHistory.value = sortByDateDesc([...priceHistory.value]).slice(0, 20);
+};
 </script>
+<!-- ('2025-06-14', { bitcoin: '65432.12', ethereum: '3321.88' }) -->
 
 
 <style>

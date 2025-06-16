@@ -2,9 +2,11 @@
     <div class="wrapper">
         <h1 class="greeting">Crypto Trackr</h1>
         <NuxtLink class="link" to='/portfolio'>
-            💼 View Portfolio
+            View Portfolio
         </NuxtLink>
 
+        <ModalChart v-if="showModal" :visible="showModal" :coin="selectedCoin" :fullHistory="priceHistory"
+            :startDate="startDate" :endDate="endDate" @close="showModal = false" />
 
         <div class="filters">
             <input type="date" v-model="startDate" />
@@ -13,8 +15,8 @@
             <button @click="reset">Reset</button>
         </div>
 
-        <div v-if="filteredHistory">
-            <table class="crypto-table">
+        <div v-if="filteredHistory.length">
+            <table class="crypto-table" v-if="showCurrentTable">
                 <thead>
                     <tr>
                         <th>Coin</th>
@@ -24,22 +26,14 @@
                         <th>Price</th>
                     </tr>
                 </thead>
-                <tbody v-for="(entry, index) in currentValue" :key="index">
-                    <tr>
-                        <td>{{ "Bitcoin (BTC)" }}</td>
-                        <td>{{ entry.date }}</td>
-                        <td :class="btcClass">{{ changes.bitcoinChangeOneDay }}%</td>
-                        <td :class="btcClass">{{ changes.bitcoinChange }}%</td>
-                        <td><b>{{ entry.bitcoin }} €</b> </td>
+                <tbody>
+                    <tr v-for="coin in trackedCoins" :key="coin" @click="openModal(coin)">
+                        <td>{{ coinLabels[coin] }}</td>
+                        <td>{{ currentValue[0]?.date }}</td>
+                        <td :class="getChangeClass(changes[coin]?.oneDay)">{{ changes[coin]?.oneDay }}%</td>
+                        <td :class="getChangeClass(changes[coin]?.week)">{{ changes[coin]?.week }}%</td>
+                        <td><b>{{ currentValue[0]?.[coin] }} €</b></td>
                     </tr>
-                    <tr>
-                        <td>{{ "Ethereum (ETH)" }}</td>
-                        <td>{{ entry.date }}</td>
-                        <td :class="ethClass">{{ changes.ethereumChangeOneDay }}%</td>
-                        <td :class="ethClass">{{ changes.ethereumChange }}%</td>
-                        <td><b>{{ entry.ethereum }} €</b> </td>
-                    </tr>
-
                 </tbody>
             </table>
 
@@ -49,15 +43,13 @@
                 <thead>
                     <tr>
                         <th>Date</th>
-                        <th>Bitcoin (BTC)</th>
-                        <th>Ethereum (ETH)</th>
+                        <th v-for="coin in trackedCoins" :key="coin">{{ coinLabels[coin] }}</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr v-for="(entry, index) in filteredHistory" :key="index">
                         <td>{{ entry.date }}</td>
-                        <td>{{ entry.bitcoin }} €</td>
-                        <td>{{ entry.ethereum }} €</td>
+                        <td v-for="coin in trackedCoins" :key="coin">{{ entry[coin] }} €</td>
                     </tr>
                 </tbody>
             </table>
@@ -69,6 +61,15 @@
 
 <script setup>
 import { ref, computed } from 'vue';
+import ModalChart from '@/components/Modal.vue';
+
+const trackedCoins = ['bitcoin', 'ethereum', 'ripple', 'cardano'];
+const coinLabels = {
+    bitcoin: 'Bitcoin (BTC)',
+    ethereum: 'Ethereum (ETH)',
+    ripple: 'Ripple (XRP)',
+    cardano: 'Cardano (ADA)'
+};
 
 const priceHistory = ref([]);
 const filteredHistory = ref([]);
@@ -77,93 +78,72 @@ const endDate = ref(null);
 const daysBack = ref(90);
 const currentValue = ref([]);
 const showHistory = ref(false);
+const showModal = ref(false);
+const showCurrentTable = ref(true)
+const selectedCoin = ref('');
 
-const changes = ref({ bitcoinChange: null, ethereumChange: null, bitcoinChangeOneDay: null, ethereumChangeOneDay: null });
-const hasIncreasedBtc = ref(null);
-const hasIncreasedEth = ref(null);
-const hasDecreasedBtc = ref(null);
-const hasDecreasedEth = ref(null);
+const changes = ref({});
 
-const btcClass = computed(() => (hasIncreasedBtc.value ? 'increase' : 'decrease'));
-const ethClass = computed(() => (hasIncreasedEth.value ? 'increase' : 'decrease'));
+const getChangeClass = (val) => val >= 0 ? 'increase' : 'decrease';
 
 const sortByDateDesc = (arr) => arr.sort((a, b) => new Date(b.date) - new Date(a.date));
 
-const calculateWeeklyChange = () => {
-    if (!priceHistory.value.length) return;
+const openModal = (coin) => {
+    selectedCoin.value = coin;
+    showModal.value = true;
+};
 
-    const sorted = sortByDateDesc([...priceHistory.value]);
+const fetchData = async () => {
+    const coinData = await Promise.all(trackedCoins.map(coin =>
+        useFetch(`https://api.coingecko.com/api/v3/coins/${coin}/market_chart`, {
+            params: { vs_currency: 'eur', days: daysBack }
+        })
+    ));
+
+    const dateMap = new Map();
+
+    trackedCoins.forEach((coin, i) => {
+        const coinPrices = coinData[i].data.value?.prices || [];
+        coinPrices.forEach(([timestamp, price], idx) => {
+            const date = new Date(timestamp).toISOString().split('T')[0];
+            if (!dateMap.has(date)) dateMap.set(date, { date });
+            dateMap.get(date)[coin] = price.toFixed(2);
+        });
+    });
+
+    priceHistory.value = sortByDateDesc(Array.from(dateMap.values()));
+    filteredHistory.value = priceHistory.value.slice(0, 20);
+    currentValue.value = filteredHistory.value.slice(0, 1);
+
+    calculateChanges();
+};
+
+const calculateChanges = () => {
+    const sorted = priceHistory.value;
+    if (!sorted.length) return;
+
     const current = sorted[0];
     const currentDate = new Date(current.date);
-    const currentBtc = parseFloat(current.bitcoin);
-    const currentEth = parseFloat(current.ethereum);
 
     const sevenDaysAgo = new Date(currentDate);
     sevenDaysAgo.setDate(currentDate.getDate() - 7);
 
-    const dayAgo = new Date(currentDate);
-    dayAgo.setDate(currentDate.getDate() - 1)
+    const oneDayAgo = new Date(currentDate);
+    oneDayAgo.setDate(currentDate.getDate() - 1);
 
-    const past = sorted.find(e => new Date(e.date) <= sevenDaysAgo);
-    const pastOneDay = sorted.find(e => new Date(e.date) <= dayAgo);
-    if (!past) return;
+    const pastWeek = sorted.find(e => new Date(e.date) <= sevenDaysAgo);
+    const pastDay = sorted.find(e => new Date(e.date) <= oneDayAgo);
 
-    const btcChange = ((currentBtc - parseFloat(past.bitcoin)) / parseFloat(past.bitcoin)) * 100;
-    const ethChange = ((currentEth - parseFloat(past.ethereum)) / parseFloat(past.ethereum)) * 100;
+    trackedCoins.forEach(coin => {
+        const now = parseFloat(current[coin]);
+        const week = pastWeek ? parseFloat(pastWeek[coin]) : null;
+        const day = pastDay ? parseFloat(pastDay[coin]) : null;
 
-    const btcChangeOneDay = ((currentBtc - parseFloat(pastOneDay.bitcoin)) / parseFloat(pastOneDay.bitcoin)) * 100;
-    const ethChangeOneDay = ((currentEth - parseFloat(pastOneDay.ethereum)) / parseFloat(pastOneDay.ethereum)) * 100;
-
-
-    changes.value.bitcoinChange = btcChange.toFixed(2);
-    changes.value.ethereumChange = ethChange.toFixed(2);
-    changes.value.bitcoinChangeOneDay = btcChangeOneDay.toFixed(2);
-    changes.value.ethereumChangeOneDay = ethChangeOneDay.toFixed(2);
-
-    hasIncreasedBtc.value = btcChange >= 0;
-    hasDecreasedBtc.value = btcChange < 0;
-    hasIncreasedEth.value = ethChange >= 0;
-    hasDecreasedEth.value = ethChange < 0;
-};
-
-const { data: btcData } = await useFetch(
-    'https://api.coingecko.com/api/v3/coins/bitcoin/market_chart',
-    { params: { vs_currency: 'eur', days: daysBack } }
-);
-
-const { data: ethData } = await useFetch(
-    'https://api.coingecko.com/api/v3/coins/ethereum/market_chart',
-    { params: { vs_currency: 'eur', days: daysBack } }
-);
-
-if (btcData.value && ethData.value) {
-    const btcPrices = btcData.value.prices;
-    const ethPrices = ethData.value.prices;
-
-    const dailyMap = new Map();
-
-    btcPrices.forEach((btcEntry, i) => {
-        const date = new Date(btcEntry[0]).toLocaleString().split('T')[0];
-
-        if (!dailyMap.has(date)) {
-            dailyMap.set(date, {
-                date,
-                bitcoin: btcEntry[1].toFixed(2),
-                ethereum: ethPrices[i] ? ethPrices[i][1].toFixed(2) : 'N/A',
-            });
-        }
+        changes.value[coin] = {
+            week: week ? ((now - week) / week * 100).toFixed(2) : 'N/A',
+            oneDay: day ? ((now - day) / day * 100).toFixed(2) : 'N/A'
+        };
     });
-
-    priceHistory.value = Array.from(dailyMap.values());
-
-    filteredHistory.value = sortByDateDesc([...priceHistory.value]).slice(0, 20);
-    currentValue.value = filteredHistory.value.slice(0, 1);
-    calculateWeeklyChange();
-}
-
-
-const toggleHistory = () => {
-    showHistory.value = !showHistory.value;
 };
 
 const filterByDate = () => {
@@ -181,14 +161,23 @@ const filterByDate = () => {
             return date >= start && date <= end;
         })
     ).slice(0, 20);
+    showCurrentTable.value = false
+    showHistory.value = true
+};
+
+const toggleHistory = () => {
+    showHistory.value = !showHistory.value;
+    showCurrentTable.value = true
 };
 
 const reset = () => {
     filteredHistory.value = sortByDateDesc([...priceHistory.value]).slice(0, 20);
-};
-</script>
-<!-- ('2025-06-14', { bitcoin: '65432.12', ethereum: '3321.88' }) -->
 
+    showCurrentTable.value = true
+    showHistory.value = false
+};
+await fetchData();
+</script>
 
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');
@@ -202,7 +191,6 @@ body {
 }
 
 .wrapper {
-    max-width: 900px;
     margin: 0 auto;
     padding: 2rem;
     background-color: #ffffff;
@@ -271,13 +259,13 @@ button:hover {
 }
 
 .crypto-table th {
-    background-color: #f0f0f0;
+    background-color: #cccccc;
     font-weight: 600;
     color: #333;
 }
 
 .crypto-table tbody tr:hover {
-    background-color: #f9f9f9;
+    background-color: #f0f0f0;
 }
 
 .increase {

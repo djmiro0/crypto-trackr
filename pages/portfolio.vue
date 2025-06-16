@@ -1,6 +1,6 @@
 <template>
   <div class="wrapper">
-    <h1>💼 My Portfolio</h1>
+    <h1>My Portfolio</h1>
 
     <NuxtLink class="link" to="/">
       Back
@@ -40,7 +40,7 @@
     </table>
 
 
-    <p v-else>No entries..</p>
+    <p v-else>No entries.</p>
 
     <!-- Total Value -->
     <div class="total">

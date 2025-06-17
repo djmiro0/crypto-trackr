@@ -1,0 +1,16 @@
+{
+    "title": "My Portfolio",
+    "back": "Back",
+    "add": "+ Add",
+    "currency": "Currency",
+    "amount": "Amount",
+    "price": "Buy Price (€)",
+    "time": "Purchase Time",
+    "actions": "Actions",
+    "delete": "Delete",
+    "details": "Details",
+    "total": "Total Portfolio Value",
+    "noEntries": "No entries.",
+    "loading": "Loading..."
+  }
+  

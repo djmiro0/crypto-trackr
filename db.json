@@ -1,3 +1,11 @@
 {
-  "portfolio": []
+  "portfolio": [
+    {
+      "id": "6cfd",
+      "currency": "Ripple",
+      "amount": 2,
+      "purchasePrice": "3.86",
+      "purchaseTime": "6/17/2025, 2:02:20 PM"
+    }
+  ]
 }

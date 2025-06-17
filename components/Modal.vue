@@ -1,32 +1,29 @@
 <template>
-    <div class="modal-backdrop" @click.self="close">
+    <div class="modal-backdrop" @click.self="emit('close')">
         <div class="modal-content">
-            <h2>Bitcoin Price History</h2>
+            <h2>Price History</h2>
             <div class="date-filters">
-                <label>From:
-                    <input type="date" v-model="startDate" />
-                </label>
-                <label>To:
-                    <input type="date" v-model="endDate" />
-                </label>
+                <label>From: <input type="date" v-model="startDate" /></label>
+                <label>To: <input type="date" v-model="endDate" /></label>
                 <button @click="filterChart">Update</button>
             </div>
 
             <div class="chart-container">
                 <highchart :options="chartOptions" />
             </div>
-            <button class="close-button" @click="close">Close</button>
+
+            <button class="close-button" @click="emit('close')">Close</button>
         </div>
     </div>
 </template>
 
 <script setup>
-import { ref, watchEffect } from 'vue'
+import { ref, watchEffect, computed } from 'vue'
 
 const props = defineProps({
     visible: Boolean,
-    onClose: Function,
     fullHistory: Array,
+    portfolioHistory: Array,
     coin: String
 })
 
@@ -35,22 +32,20 @@ const emit = defineEmits(['close'])
 const startDate = ref('')
 const endDate = ref('')
 const chartOptions = ref({})
-const coin = ref(props.coin)
-const coinColors = ref({
-    bitcoin: '#f7931a',
-    ethereum: '#3c3c3d',
-    solana: '#00ffa3',
-    cardano: '#0033ad',
-    polkadot: '#e6007a',
-    avalanche: '#e84142',
-    binancecoin: '#f3ba2f',
-    ripple: '#346aa9',
-    litecoin: '#bebebe',
-    dogecoin: '#c2a633'
-})
 
-const close = () => {
-    emit('close')
+const coin = computed(() => props.coin.toLowerCase())
+
+const relatedPurchases = computed(() =>
+    props.portfolioHistory?.filter(entry =>
+        entry.currency.toLowerCase() === coin.value
+    ) || []
+)
+
+const coinColors = {
+    bitcoin: '#f7931a', ethereum: '#3c3c3d', solana: '#00ffa3',
+    cardano: '#0033ad', polkadot: '#e6007a', avalanche: '#e84142',
+    binancecoin: '#f3ba2f', ripple: '#346aa9', litecoin: '#bebebe',
+    dogecoin: '#c2a633'
 }
 
 const filterChart = () => {
@@ -74,37 +69,52 @@ const updateChart = (data) => {
             height: 300,
             backgroundColor: 'transparent'
         },
-        title: {
-            text: coin.value
-        },
+        title: { text: coin.value },
         xAxis: {
-            categories: data.map(i => i.date).reverse(),
+            categories: data.map(i => i.date),
             labels: { rotation: -45, style: { fontSize: '10px' } }
         },
-        yAxis: {
-            title: { text: 'Price (€)' },
-        },
+        yAxis: { title: { text: 'Price (€)' } },
         tooltip: {
-            valueSuffix: ' €'
+            formatter() {
+                return this.series.name === 'Your Purchase(s)'
+                    ? `${this.point.name}<br/>Price: ${this.y} €`
+                    : `<b>${this.series.name}</b><br/>Price: ${this.y} €`
+            }
         },
-        legend: { enabled: false },
+        legend: { enabled: true },
         credits: { enabled: false },
         series: [
             {
-                name: coin.value,
+                name: `${coin.value.toUpperCase()} Price`,
                 data: data.map(i => parseFloat(i[coin.value])),
-                color: coinColors.value[coin.value] || '#000'
+                color: coinColors[coin.value] || '#000'
+            },
+            {
+                name: 'Your Purchase(s)',
+                type: 'scatter',
+                color: '#ff4d4d',
+                marker: { symbol: 'circle', radius: 6 },
+                data: relatedPurchases.value.map(p => {
+                    const date = new Date(p.purchaseTime).toISOString().split('T')[0]
+                    const index = data.findIndex(d => d.date === date)
+                    return index !== -1
+                        ? { x: index, y: parseFloat(p.purchasePrice), name: `${p.amount} bought` }
+                        : null
+                }).filter(Boolean)
             }
         ]
-
     }
 }
 
 watchEffect(() => {
-    if (props.visible && props.fullHistory.length) {
-        const initialData = props.fullHistory.slice(0, 20)
-        updateChart(initialData)
-    }
+    if (!props.visible) return
+
+    const initialData = props.fullHistory?.length
+        ? props.fullHistory.slice(0, 20)
+        : props.portfolioHistory?.slice(0, 20) || []
+
+    updateChart(initialData)
 })
 </script>
 
@@ -115,7 +125,7 @@ watchEffect(() => {
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0, 0, 0, 0.6);
+    background: rgba(0, 0, 0, 0.6);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -128,7 +138,6 @@ watchEffect(() => {
     border-radius: 10px;
     width: 90%;
     max-width: 700px;
-    position: relative;
 }
 
 .date-filters {
@@ -148,7 +157,7 @@ watchEffect(() => {
 
 .close-button {
     margin-top: 1.5rem;
-    background-color: #0066cc;
+    background: #0066cc;
     color: white;
     border: none;
     padding: 0.6rem 1.2rem;
@@ -157,6 +166,6 @@ watchEffect(() => {
 }
 
 .close-button:hover {
-    background-color: #004a99;
+    background: #004a99;
 }
 </style>

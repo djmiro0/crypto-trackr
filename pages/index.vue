@@ -1,11 +1,13 @@
 <template>
     <div class="wrapper">
-        <h1 class="greeting">Crypto Trackr</h1>
-        <NuxtLink class="link" to="/portfolio">View Portfolio</NuxtLink>
-        <!-- <select v-model="$i18n.locale">
+        <h1 class="greeting">CryptoTrackr</h1>
+        <NuxtLink class="link" to="/portfolio">{{ $t("viewPortfolio") }}</NuxtLink>
+
+        <select class="language-select" @change="changeLang($event)">
             <option value="en">English</option>
             <option value="de">German</option>
-        </select> -->
+        </select>
+
 
         <ModalChart v-if="showModal" :visible="showModal" :coin="selectedCoin" :fullHistory="priceHistory"
             :startDate="startDate" :endDate="endDate" @close="showModal = false" />
@@ -13,24 +15,30 @@
         <div class="filters">
             <input type="date" v-model="startDate" />
             <input type="date" v-model="endDate" />
-            <button @click="filterByDate">Search</button>
-            <button @click="reset">Reset</button>
+            <button @click="filterByDate">{{ $t("search") }}</button>
+            <button @click="reset" class="resetButton">{{ $t("reset") }}</button>
         </div>
 
         <div v-if="filteredHistory.length">
             <table class="crypto-table" v-if="showCurrentTable">
                 <thead>
                     <tr>
-                        <th>Coin</th>
-                        <th>Date</th>
-                        <th>Last 24h</th>
-                        <th>Last Week</th>
-                        <th>Price</th>
+                        <th>
+                            {{ $t("coin") }}
+                        </th>
+                        <th>{{ $t("date") }}</th>
+                        <th>{{ $t("last24h") }}</th>
+                        <th>{{ $t("lastWeek") }}</th>
+                        <th>{{ $t("priceEuro") }}</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr v-for="coin in trackedCoins" :key="coin" @click="openModal(coin)">
-                        <td>{{ coinLabels[coin] }}</td>
+                        <td class="currencyColumn">
+                            <Icon :name="`cryptocurrency:${coinSymbolMap[coin]}`" size="17"
+                                style="margin-right: 8px;" />
+                            {{ coinLabels[coin] }}
+                        </td>
                         <td>{{ currentValue[0]?.date }}</td>
                         <td :class="getChangeClass(changes[coin]?.oneDay)">
                             {{ changes[coin]?.oneDay }}%
@@ -44,13 +52,13 @@
             </table>
 
             <button @click="toggleHistory">
-                {{ showHistory ? 'Hide' : 'Load' }} History
+                {{ showHistory ? $t("hideHistory") : $t("loadHistory") }}
             </button>
 
             <table class="crypto-table" v-if="showHistory">
                 <thead>
                     <tr>
-                        <th>Date</th>
+                        <th>{{ $t("date") }}</th>
                         <th v-for="coin in trackedCoins" :key="coin">{{ coinLabels[coin] }}</th>
                     </tr>
                 </thead>
@@ -63,24 +71,35 @@
             </table>
         </div>
 
-        <div v-if="isLoading">Loading...</div>
-        <div v-else-if="!filteredHistory.length">Failed to load data. Please try again.</div>
+        <div v-if="isLoading">{{ $t("loading") }}</div>
+        <div v-else-if="!filteredHistory.length">{{ $t("failedToLoad") }}</div>
     </div>
 </template>
+
 
 <script setup>
 import { ref, onMounted } from 'vue'
 import ModalChart from '@/components/Modal.vue'
 import { useState } from '#app'
-// import { useI18n } from 'vue-i18n'
+import { useI18n } from 'vue-i18n'
 
-// const { locale } = useI18n()
+const { locale } = useI18n()
 
-// const changeLang = (lang) => {
-//     locale.value = lang
-// }
+const changeLang = (event) => {
+    locale.value = event.target.value
+}
+
 
 const trackedCoins = ['bitcoin', 'ethereum', 'ripple', 'cardano']
+
+//for the icons
+const coinSymbolMap = {
+    bitcoin: 'btc',
+    ethereum: 'eth',
+    ripple: 'xrp',
+    cardano: 'ada'
+}
+
 const coinLabels = {
     bitcoin: 'Bitcoin (BTC)',
     ethereum: 'Ethereum (ETH)',
@@ -206,6 +225,7 @@ onMounted(async () => {
 
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Rubik+Glitch&display=swap');
 
 body {
     margin: 0;
@@ -224,11 +244,12 @@ body {
 }
 
 .greeting {
-    font-size: 2rem;
+    font-size: 3rem;
     font-weight: 600;
     margin-bottom: 3rem;
-    color: #333;
     text-align: center;
+    font-family: "Rubik Glitch", system-ui;
+    font-weight: 400;
 }
 
 .link {
@@ -276,6 +297,14 @@ button:hover {
     background-color: #004a99;
 }
 
+.resetButton {
+    background-color: #888;
+}
+
+.resetButton:hover {
+    background-color: #5f5f5f;
+}
+
 .crypto-table {
     width: 100%;
     border-collapse: collapse;
@@ -300,11 +329,46 @@ button:hover {
     background-color: #f0f0f0;
 }
 
+.currencyColumn {
+    display: flex;
+    align-items: flex-start;
+}
+
 .increase {
     color: green;
 }
 
 .decrease {
     color: crimson;
+}
+
+.language-select {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    border: 1px solid #cccccc;
+    border-radius: 6px;
+    padding: 0.5rem 2rem 0.5rem 0.75rem;
+    font-size: 1rem;
+    font-family: 'Inter', sans-serif;
+    color: #333;
+    position: relative;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L6 6L11 1' stroke='%23666' stroke-width='2'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 12px;
+    transition: border-color 0.3s, box-shadow 0.3s;
+    cursor: pointer;
+    margin-left: 1rem;
+}
+
+.language-select:hover {
+    border-color: #888;
+}
+
+.language-select:focus {
+    outline: none;
+    border-color: #0066cc;
+    box-shadow: 0 0 0 2px rgba(0, 102, 204, 0.2);
 }
 </style>

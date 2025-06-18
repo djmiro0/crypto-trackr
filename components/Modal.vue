@@ -1,24 +1,29 @@
 <template>
     <div class="modal-backdrop" @click.self="emit('close')">
         <div class="modal-content">
-            <h2>Price History</h2>
+            <h2>{{ t('priceHistory') }}</h2>
+
             <div class="date-filters">
-                <label>From: <input type="date" v-model="startDate" /></label>
-                <label>To: <input type="date" v-model="endDate" /></label>
-                <button @click="filterChart">Update</button>
+                <label>{{ t('from') }}: <input type="date" v-model="startDate" /></label>
+                <label>{{ t('to') }}: <input type="date" v-model="endDate" /></label>
+                <button @click="filterChart">{{ t('update') }}</button>
             </div>
 
             <div class="chart-container">
                 <highchart :options="chartOptions" />
             </div>
 
-            <button class="close-button" @click="emit('close')">Close</button>
+            <button class="close-button" @click="emit('close')">{{ t('close') }}</button>
         </div>
     </div>
 </template>
 
+
 <script setup>
 import { ref, watchEffect, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const props = defineProps({
     visible: Boolean,

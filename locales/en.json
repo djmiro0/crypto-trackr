@@ -11,6 +11,27 @@
     "details": "Details",
     "total": "Total Portfolio Value",
     "noEntries": "No entries.",
-    "loading": "Loading..."
+    "loading": "Loading...",
+    "cryptoTrackr": "Crypto Trackr",
+    "viewPortfolio": "View Portfolio",
+    "search": "Search",
+    "reset": "Reset",
+    "coin": "Coin",
+    "date": "Date",
+    "last24h": "Last 24h",
+    "lastWeek": "Last Week",
+    "priceEuro": "Price (€)",
+    "hideHistory": "Hide History",
+    "loadHistory": "Load History",
+    "failedToLoad": "Failed to load data. Please try again.",
+    "edit": "Edit",
+    "editing": "Editing",
+    "update": "Update",
+    "priceHistory": "Price History",
+    "from": "From",
+    "to": "To",
+    "close": "Close"
+      
+      
   }
   

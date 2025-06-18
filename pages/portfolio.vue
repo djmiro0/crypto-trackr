@@ -1,67 +1,80 @@
-<template>
-  <div class="wrapper">
-    <h1>My Portfolio</h1>
+  <template>
+    <div class="wrapper">
+      <h1>{{ t('title') }}</h1>
 
-    <NuxtLink class="link" to="/">Back</NuxtLink>
+      <NuxtLink class="link" to="/">{{ t('back') }}</NuxtLink>
 
-    <ModalChart v-if="showModal" :visible="showModal" :coin="selectedCoin" :portfolioHistory="portfolio"
-      @close="showModal = false" />
+      <ModalChart v-if="showModal" :visible="showModal" :coin="selectedCoin" :portfolioHistory="portfolio"
+        @close="showModal = false" />
 
-    <form @submit.prevent="addEntry" class="form">
-      <select v-model="newEntry.currency" @change="handleAmountChange" required>
-        <option disabled value="">Select currency</option>
-        <option v-for="currency in popularCurrencies" :key="currency" :value="currency">
-          {{ currency }}
-        </option>
-      </select>
+      <form @submit.prevent="saveEntry" class="form">
+        <select v-model="newEntry.currency" @change="handleAmountChange" required>
+          <option disabled value="">{{ t('currency') }}</option>
+          <option v-for="currency in popularCurrencies" :key="currency" :value="currency">
+            {{ currency }}
+          </option>
+        </select>
 
-      <input v-model.number="newEntry.amount" type="number" @input="handleAmountChange" placeholder="Amount" required />
-      <input :value="`${newEntry.purchasePrice} €`" disabled placeholder="Auto-calculated price (€)" />
-      <button type="submit">+ Add</button>
-    </form>
+        <input v-model.number="newEntry.amount" type="number" @input="handleAmountChange" :placeholder="t('amount')"
+          required />
+        <input :value="`${newEntry.purchasePrice} €`" disabled :placeholder="t('price')" />
+        <button type="submit">{{ isEditing ? t('update') : t('add') }}</button>
+        <button type="button" v-if="isEditing" @click="resetForm">{{ t('reset') }}</button>
+      </form>
 
-    <table class="crypto-table" v-if="portfolio.length">
-      <thead>
-        <tr>
-          <th>Currency</th>
-          <th>Amount</th>
-          <th>Buy Price (€)</th>
-          <th>Purchase Time</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="entry in portfolio" :key="entry.id">
-          <td>{{ entry.currency }}</td>
-          <td>{{ entry.amount }}</td>
-          <td>{{ entry.purchasePrice }}</td>
-          <td>{{ entry.purchaseTime }}</td>
-          <td>
-            <button @click="deleteEntry(entry.id)" class="deleteButton">
-              <Icon name="uil:trash" color="white" size="15" />
-              Delete
-            </button>
-            <button @click="openModal(entry.currency.toLowerCase())">
-              <Icon name="uil:analytics" color="white" size="15" />
-              Details
-            </button>
-          </td>
-        </tr>
-      </tbody>
-    </table>
+      <table class="crypto-table" v-if="portfolio.length">
+        <thead>
+          <tr>
+            <th>{{ t('currency') }}</th>
+            <th>{{ t('amount') }}</th>
+            <th>{{ t('price') }}</th>
+            <th>{{ t('time') }}</th>
+            <th>{{ t('actions') }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="entry in portfolio" :key="entry.id">
+            <td @click="openModal(entry.currency.toLowerCase())">
+              <Icon :name="`cryptocurrency:${coinSymbolMap[entry.currency.toLowerCase()]}`" size="17"
+                style="margin-right: 8px;" />{{
+                  entry.currency }}
+            </td>
+            <td>{{ entry.amount }}</td>
+            <td>{{ entry.purchasePrice }}</td>
+            <td>{{ entry.purchaseTime }}</td>
+            <td>
+              <button @click="deleteEntry(entry.id)"
+                :class="['deleteButton', { disabled: isEditing && editingId !== entry.id }]"
+                :disabled="isEditing && editingId !== entry.id">
+                <Icon name="uil:trash" color="white" size="15" />
+                {{ t('delete') }}
+              </button>
+              <button @click="editEntry(entry)" :disabled="isEditing && editingId !== entry.id">
+                <Icon name="uil:edit" color="white" size="15" />
+                {{ isEditing && editingId === entry.id ? t('editing') : t('edit') }}
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
 
-    <p v-if="isLoading">Loading...</p>
-    <p v-if="!isLoading && !portfolio.length">No entries.</p>
+      <p v-if="isLoading">{{ t('loading') }}</p>
+      <p v-if="!isLoading && !portfolio.length">{{ t('noEntries') }}</p>
 
-    <div class="total">
-      <strong>Total Portfolio Value: </strong>{{ totalValue }} €
+      <div class="total">
+        <strong>{{ t('total') }}: </strong>{{ totalValue }} €
+      </div>
     </div>
-  </div>
-</template>
+  </template>
+
 
 <script setup>
 import { ref, onMounted } from 'vue'
 import ModalChart from '@/components/Modal.vue'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
+
 
 const API_URL = 'http://localhost:3001/portfolio'
 
@@ -70,6 +83,8 @@ const totalValue = ref(0)
 const showModal = ref(false)
 const selectedCoin = ref('')
 const isLoading = ref(true)
+const isEditing = ref(false)
+const editingId = ref(null)
 
 const newEntry = ref({
   currency: '',
@@ -77,6 +92,14 @@ const newEntry = ref({
   purchasePrice: 0,
   purchaseTime: ''
 })
+
+//for the icons
+const coinSymbolMap = {
+  bitcoin: 'btc',
+  ethereum: 'eth',
+  ripple: 'xrp',
+  cardano: 'ada'
+}
 
 const popularCurrencies = ['Bitcoin', 'Ethereum', 'Ripple', 'Cardano']
 
@@ -110,28 +133,52 @@ const fetchPortfolio = async () => {
   isLoading.value = false
 }
 
-const addEntry = async () => {
-  newEntry.value.purchaseTime = new Date().toLocaleString()
+const saveEntry = async () => {
+  if (!newEntry.value.currency || !newEntry.value.amount) return
 
-  await fetch(API_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(newEntry.value)
-  })
+  if (isEditing.value && editingId.value !== null) {
+    // Update existing entry
+    await fetch(`${API_URL}/${editingId.value}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newEntry.value)
+    })
+  } else {
+    // Add new entry
+    newEntry.value.purchaseTime = new Date().toLocaleString()
 
+    await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newEntry.value)
+    })
+  }
+
+  resetForm()
+  await fetchPortfolio()
+}
+
+const editEntry = (entry) => {
+  isEditing.value = true
+  editingId.value = entry.id
+  newEntry.value = { ...entry }
+}
+
+const resetForm = () => {
+  isEditing.value = false
+  editingId.value = null
   newEntry.value = {
     currency: '',
     amount: null,
-    purchasePrice: null,
+    purchasePrice: 0,
     purchaseTime: ''
   }
-
-  await fetchPortfolio()
 }
 
 const deleteEntry = async (id) => {
   await fetch(`${API_URL}/${id}`, { method: 'DELETE' })
   await fetchPortfolio()
+  resetForm()
 }
 
 onMounted(fetchPortfolio)
@@ -179,10 +226,18 @@ button {
   padding: 0.5rem 1rem;
   border-radius: 6px;
   cursor: pointer;
+  font-size: 14px;
+  align-items: center;
 }
 
 button:hover {
   background-color: #004a99;
+}
+
+button:disabled,
+button.disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .deleteButton {

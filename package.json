@@ -10,6 +10,7 @@
     "postinstall": "nuxt prepare"
   },
   "dependencies": {
+    "@iconify/vue": "^5.0.0",
     "@nuxt/icon": "^1.13.0",
     "nuxt": "^3.17.5",
     "nuxt-highcharts": "^3.1.1",

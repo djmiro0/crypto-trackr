@@ -1,11 +1,18 @@
 {
   "portfolio": [
     {
-      "id": "6cfd",
-      "currency": "Ripple",
-      "amount": 2,
-      "purchasePrice": "3.86",
-      "purchaseTime": "6/17/2025, 2:02:20 PM"
+      "id": "62b9",
+      "currency": "Bitcoin",
+      "amount": 33,
+      "purchasePrice": "3013244.52",
+      "purchaseTime": "6/18/2025, 9:59:59 AM"
+    },
+    {
+      "id": "3fb5",
+      "currency": "Ethereum",
+      "amount": 4,
+      "purchasePrice": "8773.24",
+      "purchaseTime": "6/18/2025, 10:09:33 AM"
     }
   ]
 }

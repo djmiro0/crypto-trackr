@@ -2,6 +2,17 @@
 
 Look at the [Nuxt documentation](https://nuxt.com/docs/getting-started/introduction) to learn more.
 
+## Technologies Used
+
+This app was built using the following tools and libraries:
+
+- **Vue/Nuxt** – Core frontend framework and SSR platform.
+- **Highcharts (via Nuxt)** – For rendering interactive charts and graphs.
+- **Google Fonts** – For custom typography and enhanced visual design.
+- **CoinGecko API** – To fetch live cryptocurrency data.
+- **Nuxt Icons** – For scalable and customizable SVG icon usage.
+- **useI18n (Nuxt)** – For internationalization and managing translations.
+
 ## Setup
 
 Make sure to install dependencies:
@@ -10,23 +21,11 @@ Make sure to install dependencies:
 # npm
 npm install
 
-# pnpm
-pnpm install
-
-# yarn
-yarn install
-
-# bun
-bun install
-```
-
-## Development Server
-
-Start the development server on `http://localhost:3000`:
+Development Server
+Start the development server on http://localhost:3000:
 
 Locally development production environment:
 
-```bash
 # npm
 npm nuxt dev
 
